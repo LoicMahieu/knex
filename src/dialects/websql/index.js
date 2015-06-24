@@ -31,10 +31,8 @@ assign(Client_WebSQL.prototype, {
       try {
         /*jslint browser: true*/
         var db = openDatabase(client.name, client.version, client.displayName, client.estimatedSize);
-        db.transaction(function(t) {
-          t.__knexUid = _.uniqueId('__knexUid');
-          resolve(t);
-        });
+        db.__knexUid = _.uniqueId('__knexUid');
+        resolve(db);
       } catch (e) {
         reject(e);
       }
@@ -52,12 +50,22 @@ assign(Client_WebSQL.prototype, {
   _query: function(connection, obj) {
     return new Promise(function(resolver, rejecter) {
       if (!connection) return rejecter(new Error('No connection provided.'));
-      connection.executeSql(obj.sql, obj.bindings, function(trx, response) {
-        obj.response = response;
-        return resolver(obj);
-      }, function(trx, err) {
+
+      function query (t) {
+        t.executeSql(obj.sql, obj.bindings, function(trx, response) {
+          obj.response = response;
+          return resolver(obj);
+        }, function(trx, err) {
+          console.error('SQLError: ', err.message);
+          rejecter(err);
+        });
+      }
+
+      try {
+        connection.transaction(query);
+      } catch (err) {
         rejecter(err);
-      });
+      }
     });
   },
 
